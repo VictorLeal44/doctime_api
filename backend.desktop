@@ -1,0 +1,10 @@
+[Desktop Entry]
+Version=1.0
+Type=Application
+Name=backend
+Comment=
+Exec=/home/archimago/Proyectos/Apps_funda_salud/backend/iniciar.sh
+Icon=
+Path=/home/archimago/Proyectos/Apps_funda_salud/backend
+Terminal=true
+StartupNotify=false
