@@ -190,11 +190,17 @@ def get_appointment_by_medic(id: int, session: Session = Depends(get_session)):
         return {"mensaje": "Fallido", "error": str(e)}
 
 @router.post("/")
-def create_appointment(data: CitaCreate, session=Depends(get_session)):
+def create_appointment(data: CitaCreate, session: Session = Depends(get_session)):
     try:
-        statement = select(exists().where(Citas.estado_id == 2 and data.pacientes_id))
+        # CORREGIDO: Filtramos explícitamente por estado_id 2 Y por el paciente actual
+        statement = select(exists().where(
+            Citas.estado_id == 2,
+            Citas.pacientes_id == data.pacientes_id
+        ))
         resultado = session.exec(statement).one()
-        print('este es el resultado: ',resultado)
+        print('este es el resultado: ', resultado)
+
+        # Si 'resultado' es False (no existe una cita con estado 2 para este paciente en específico)
         if not resultado:
             new_appointment = Citas(
                 pacientes_id=data.pacientes_id,
@@ -203,15 +209,16 @@ def create_appointment(data: CitaCreate, session=Depends(get_session)):
                 estado_id=1
             )
             session.add(new_appointment)
-
-            #Session.rollback()
             session.commit()
             return {"mensaje": "Su cita fue enviada con éxito"}
+
         print("ya posee cita")
         return {"mensaje": "Ya posees una cita"}
+
     except Exception as e:
         print("simplemente falló", e)
-        Session.rollback()
+        # CORREGIDO: session en minúscula
+        session.rollback()
         return {"mensaje": "Fallido"}
 
 @router.get("/dashboard_appointment")
