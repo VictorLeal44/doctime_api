@@ -179,8 +179,23 @@ def signin_user(new_data: UsuarioPacienteSingin, session: Session = Depends(get_
         session.commit()
         session.refresh(nuevo_usuario)
         print('paciente creado con exito con la ultima id')
+        statement_paciente = select(Pacientes).where(Pacientes.usuarios_id == usuario.id)
+        paciente = session.exec(statement_paciente).first()
 
-        return {"mensaje": "Paciente registrado exitosamente", "id": nuevo_usuario.id}
+        if paciente:
+            paciente_data = PacienteRead(
+                usuarioId=usuario.id,
+                paciente_id=paciente.id,
+                fecha_de_nacimiento=paciente.fecha_de_nacimiento,
+                direccion=paciente.direccion,
+                telefono_de_emergencia=paciente.telefono_de_emergencia,
+                grupo_sanguineo_id=paciente.grupo_sanguineo_id,
+                nombre_completo=usuario.nombre_completo,
+                cedula=usuario.cedula,
+                email=usuario.email,
+                rol_id=usuario.rol_id,
+            )
+            return {"tipo": "paciente", "datos": [paciente_data], "mensaje": "realizado"}
 
     except Exception as e:
         session.rollback()  # Si algo falla, deshace todos los registros
