@@ -73,15 +73,14 @@ class SinginForm(BaseModel):
     contraseña: str
 
 class PacienteRead(BaseModel):
-    # Datos del Paciente (excluyendo usuarios_id repetido)
+
     usuarioId: int
     paciente_id: int
-    fecha_de_nacimiento: date
-    direccion: str
-    telefono_de_emergencia: int
+    fecha_de_nacimiento: Optional[date] = None
+    direccion: Optional[str] = None
+    telefono_de_emergencia: Optional[int] = None
     grupo_sanguineo_id: int
 
-    # Datos del Usuario (excluyendo contraseña)
     nombre_completo: str
     cedula: int
     email: str

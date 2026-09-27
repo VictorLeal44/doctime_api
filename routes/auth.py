@@ -152,8 +152,11 @@ def signin_user(new_data: UsuarioPacienteSingin, session: Session = Depends(get_
 
         if verificar_usuario:
             return {"mensaje": "El usuario ya existe"}
+
         print('paciente no existe comienza la creacion')
         password_en_bytes = generar_hash_contrasena(new_data.contraseña)
+
+        # Se llama 'nuevo_usuario'
         nuevo_usuario = Usuarios(
             nombre_completo=new_data.nombre_completo,
             cedula=new_data.cedula,
@@ -162,9 +165,8 @@ def signin_user(new_data: UsuarioPacienteSingin, session: Session = Depends(get_
             rol_id= 1
         )
         session.add(nuevo_usuario)
-        session.flush()  # 'flush' genera el ID de nuevo_usuario sin hacer commit aún
+        session.flush()
         print('usuario creado tomando la id')
-        # 3. Si vienen datos de médico, creamos el Horario y el Médico
 
         nuevo_paciente = Pacientes(
             usuarios_id=nuevo_usuario.id,
@@ -172,33 +174,34 @@ def signin_user(new_data: UsuarioPacienteSingin, session: Session = Depends(get_
             telefono_de_emergencia = None,
             direccion = None,
             grupo_sanguineo_id = 9
-
         )
         session.add(nuevo_paciente)
 
         session.commit()
         session.refresh(nuevo_usuario)
-        print('paciente creado con exito con la ultima id')
-        statement_paciente = select(Pacientes).where(Pacientes.usuarios_id == usuario.id)
+        print(f'paciente creado con exito con la ultima id {nuevo_usuario.id}')
+
+        statement_paciente = select(Pacientes).where(Pacientes.usuarios_id == nuevo_usuario.id)
         paciente = session.exec(statement_paciente).first()
 
         if paciente:
+            # CORREGIDO: Usar 'nuevo_usuario' en lugar de 'usuario'
             paciente_data = PacienteRead(
-                usuarioId=usuario.id,
+                usuarioId=nuevo_usuario.id,
                 paciente_id=paciente.id,
                 fecha_de_nacimiento=paciente.fecha_de_nacimiento,
                 direccion=paciente.direccion,
                 telefono_de_emergencia=paciente.telefono_de_emergencia,
                 grupo_sanguineo_id=paciente.grupo_sanguineo_id,
-                nombre_completo=usuario.nombre_completo,
-                cedula=usuario.cedula,
-                email=usuario.email,
-                rol_id=usuario.rol_id,
+                nombre_completo=nuevo_usuario.nombre_completo,
+                cedula=nuevo_usuario.cedula,
+                email=nuevo_usuario.email,
+                rol_id=nuevo_usuario.rol_id,
             )
             return {"tipo": "paciente", "datos": [paciente_data], "mensaje": "realizado"}
 
     except Exception as e:
-        session.rollback()  # Si algo falla, deshace todos los registros
+        session.rollback()
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=f"Error al registrar el usuario: {str(e)}"
