@@ -150,3 +150,9 @@ class NotificacionesCreated(BaseModel):
     usuarios_id: int
     titulo: str
     descripcion: str
+
+class UsuarioPacienteSingin(BaseModel):
+    nombre_completo : str
+    cedula: int
+    email: str
+    contraseña: str

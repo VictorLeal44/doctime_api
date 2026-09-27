@@ -8,7 +8,7 @@ from sqlmodel import Session, select, exists
 from models.database import get_session
 from models.item import Admin, Usuarios, Pacientes, Medicos
 from security.security import *
-from schemas.form import LoginForm, LoginFormAdmin, PacienteRead,MedicoSessionOut, SinginForm, HorarioOut
+from schemas.form import LoginForm, LoginFormAdmin, PacienteRead,MedicoSessionOut, SinginForm, HorarioOut, UsuarioPacienteSingin
 
 router = APIRouter()
 
@@ -143,6 +143,51 @@ def signin_admin(data: SinginForm, session: Session = Depends(get_session)):
         return {
             "mensaje": "rechazado",
         }
+
+@router.post("/signin_user")
+def signin_user(new_data: UsuarioPacienteSingin, session: Session = Depends(get_session)):
+    try:
+        statement = select(Usuarios).where(Usuarios.email == new_data.email)
+        verificar_usuario = session.exec(statement).first()
+
+        if verificar_usuario:
+            return {"mensaje": "El usuario ya existe"}
+        print('paciente no existe comienza la creacion')
+        password_en_bytes = generar_hash_contrasena(new_data.contraseña)
+        nuevo_usuario = Usuarios(
+            nombre_completo=new_data.nombre_completo,
+            cedula=new_data.cedula,
+            email=new_data.email,
+            contraseña=password_en_bytes,
+            rol_id= 1
+        )
+        session.add(nuevo_usuario)
+        session.flush()  # 'flush' genera el ID de nuevo_usuario sin hacer commit aún
+        print('usuario creado tomando la id')
+        # 3. Si vienen datos de médico, creamos el Horario y el Médico
+
+        nuevo_paciente = Pacientes(
+            usuarios_id=nuevo_usuario.id,
+            fecha_de_nacimiento = None,
+            telefono_de_emergencia = None,
+            direccion = None,
+            grupo_sanguineo_id = 9
+
+        )
+        session.add(nuevo_paciente)
+
+        session.commit()
+        session.refresh(nuevo_usuario)
+        print('paciente creado con exito con la ultima id')
+
+        return {"mensaje": "Paciente registrado exitosamente", "id": nuevo_usuario.id}
+
+    except Exception as e:
+        session.rollback()  # Si algo falla, deshace todos los registros
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Error al registrar el usuario: {str(e)}"
+        )
 
 @router.post("/new_password_admin")
 # Recibe el email para saber a quién actualizar

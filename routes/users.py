@@ -254,9 +254,16 @@ def create_user_medicos(new_data: UsuarioMedicoCreate, session: Session = Depend
 def create_user_paciente(new_data: UsuarioPacienteCreate, session: Session = Depends(get_session)):
     print(new_data)
     try:
-        # bytes_password = hash_password(datos.contraseña)
+        statement = select(Usuarios).where(Usuarios.email == new_data.email)
+        verificar_usuario = session.exec(statement).first()
+
+        if verificar_usuario:
+            return {"mensaje": "El usuario ya existe"}
+
+        # statement_paciente = select(Pacientes).where(Pacientes.usuarios_id == usuario.id)
+        # paciente = session.exec(statement_paciente).first()
+
         password_en_bytes = generar_hash_contrasena(new_data.contraseña)
-        # 2. Crear instancia de Usuario
         nuevo_usuario = Usuarios(
             nombre_completo=new_data.nombre_completo,
             cedula=new_data.cedula,
