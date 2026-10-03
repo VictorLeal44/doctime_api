@@ -310,8 +310,15 @@ def accept_appointment(values: AceptCita, session=Depends(get_session)):
         cita.hora_de_encuentro = values.hora
 
         session.add(cita)
+        nueva_notificacion = Notificaciones(
+            usuario_id=cita.pacientes_id,
+            titulo="¡Cita Aceptada!",
+            descripcion=f"Tu cita programada para el {values.fecha} a las {values.hora} ha sido aceptada.",
+            leida=False
+        )
+        session.add(nueva_notificacion)
+
         session.commit()
-        # Session.commit()
         return {"mensaje": "exitoso"}
     except Exception as e:
         print(values)
