@@ -11,6 +11,7 @@ fastapi==0.136.3
 fastapi-cli==0.0.24
 fastapi-cloud-cli==0.20.0
 fastar==0.11.0
+gevent==26.9.0
 greenlet==3.5.1
 h11==0.16.0
 httpcore==1.0.9
@@ -47,4 +48,7 @@ urllib3==2.7.0
 uvicorn==0.49.0
 uvloop==0.22.1
 watchfiles==1.2.0
+websocket==0.2.1
 websockets==16.0
+zope.event==6.2
+zope.interface==8.6
