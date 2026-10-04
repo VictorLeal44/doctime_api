@@ -9,7 +9,7 @@ class CitaCreate(BaseModel):
     especialidad_id: int
 
 
-# 1. Esquema para recibir los datos del Horario
+# 1. Esquema para recibir los datos del Horariovalues
 class HorarioCreate(BaseModel):
     dias_id: int
     hora_de_entrada: time
@@ -115,6 +115,7 @@ class MedicoSessionOut(BaseModel):
 
 class AceptCita(BaseModel):
     id : int
+    Usuario_id : int
     fecha : date
     hora : time
     medico_id : int
@@ -123,6 +124,7 @@ class CitaRecordResponse(BaseModel):
     id: Optional[int] = None
     Paciente: str
     Paciente_id: int
+    Usuario_id: int
     Asunto: str
     Especialidad_id: Optional[int] = None
 

@@ -11,9 +11,9 @@ from schemas.form import *
 
 from datetime import date
 import calendar
+from routes.websocket_manager import manager
 
 router = APIRouter()
-
 
 @router.get("/")
 def get_all_appointments(tamano_lote: int = 10, session: Session = Depends(get_session)):
@@ -85,6 +85,7 @@ def get_requests_appointment( session = Depends(get_session)):
                     Citas.id.label("id"),
                     Usuarios.nombre_completo.label("Paciente"),
                     Pacientes.id.label("Paciente_id"),
+                    Usuarios.id.label("Usuario_id"),
                     Citas.asunto.label("Asunto"),
                     Citas.especialidad_id.label("Especialidad_id")
                 )
@@ -104,7 +105,7 @@ def get_requests_appointment( session = Depends(get_session)):
         .join(Usuarios, Medicos.usuarios_id == Usuarios.id)
     )
         medicos_data = session.exec(statement_medicos).all()
-        print(medicos_data)
+        print(results)
 
         return {'mensaje':'funcionó',
             'datos':[
@@ -112,6 +113,7 @@ def get_requests_appointment( session = Depends(get_session)):
                     id=row.id,
                     Paciente=row.Paciente.strip(),
                     Paciente_id=row.Paciente_id,
+                    Usuario_id = row.Usuario_id,
                     Asunto=row.Asunto,
                     Especialidad_id=row.Especialidad_id
                 )
@@ -294,8 +296,9 @@ def category_data(session: Session = Depends(get_session)):
         return {"mensaje": "Fallido"}
 
 @router.patch("/appointment/accept")
-def accept_appointment(values: AceptCita, session=Depends(get_session)):
+async def accept_appointment(values: AceptCita, session=Depends(get_session)):
     try:
+        print(values)
         statement = select(Citas).where(Citas.id == values.id)
         cita = session.exec(statement).first()
         if cita is None:
@@ -308,17 +311,27 @@ def accept_appointment(values: AceptCita, session=Depends(get_session)):
         cita.medicos_id = values.medico_id
         cita.fecha_de_encuentro = values.fecha
         cita.hora_de_encuentro = values.hora
-
         session.add(cita)
         nueva_notificacion = Notificaciones(
-            usuario_id=cita.pacientes_id,
+            usuario_id=values.Usuario_id,
             titulo="¡Cita Aceptada!",
-            descripcion=f"Tu cita programada para el {values.fecha} a las {values.hora} ha sido aceptada.",
+            descripcion=f"Tu cita fue programada para el {values.fecha} a las {values.hora}.",
             leida=False
         )
         session.add(nueva_notificacion)
 
         session.commit()
+        session.refresh(nueva_notificacion)
+
+        payload = {
+            "id": nueva_notificacion.id,
+            "usuario_id": nueva_notificacion.usuario_id,
+            "titulo": nueva_notificacion.titulo,
+            "descripcion": nueva_notificacion.descripcion,
+            "leida": nueva_notificacion.leida
+        }
+
+        await manager.send_to_user(values.Usuario_id, payload)
         return {"mensaje": "exitoso"}
     except Exception as e:
         print(values)
