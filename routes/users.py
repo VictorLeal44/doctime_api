@@ -394,7 +394,7 @@ def update_user_patient(paciente_id: int,datos_nuevos: UsuarioPacienteEdit, sess
                 status_code=404,
                 detail="no existe en la base de datos.",
             )
-        if datos_nuevos.paciente.fecha_de_nacimiento:
+        if datos_nuevos.paciente.fecha_de_nacimiento == None:
             paciente.fecha_de_nacimiento = datos_nuevos.paciente.fecha_de_nacimiento
         paciente.telefono_de_emergencia = datos_nuevos.paciente.telefono
         paciente.direccion = datos_nuevos.paciente.direccion
