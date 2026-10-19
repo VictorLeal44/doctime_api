@@ -39,8 +39,8 @@ class UsuarioMedicoEdit(BaseModel):
 
 class PacienteCreateNested(BaseModel):
     fecha_de_nacimiento: Optional[date] = None
-    telefono: str
-    direccion: str
+    telefono: Optional[str] = None
+    direccion: Optional[str] = None
     tipo_de_sangre: int
 
 class UsuarioPacienteCreate(BaseModel):
