@@ -25,5 +25,4 @@ class ConnectionManager:
                 except Exception:
                     pass
 
-# Instancia única global que compartirán los archivos
 manager = ConnectionManager()

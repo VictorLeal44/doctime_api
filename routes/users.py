@@ -394,7 +394,8 @@ def update_user_patient(paciente_id: int,datos_nuevos: UsuarioPacienteEdit, sess
                 status_code=404,
                 detail="no existe en la base de datos.",
             )
-        paciente.fecha_de_nacimiento = datos_nuevos.paciente.fecha_de_nacimiento
+        if datos_nuevos.paciente.fecha_de_nacimiento:
+            paciente.fecha_de_nacimiento = datos_nuevos.paciente.fecha_de_nacimiento
         paciente.telefono_de_emergencia = datos_nuevos.paciente.telefono
         paciente.direccion = datos_nuevos.paciente.direccion
         paciente.grupo_sanguineo_id = datos_nuevos.paciente.tipo_de_sangre
@@ -447,8 +448,6 @@ def update_horario(user_id: int,value : HorarioUpdate, session: Session = Depend
                 datos_horario.activo = item.activo
                 session.add(datos_horario)
             session.commit()
-
-        return {"mensaje": "exitoso"}
 
         return {"mensaje": "exitoso"}
 

@@ -2,7 +2,7 @@ from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from routes.auth import router as auth_router
 from routes.citas import router as citas_router
 from routes.users import router as users_router
-from routes.websocket_manager import manager  # <--- Importación limpia
+from routes.websocket_manager import manager
 
 app = FastAPI()
 
