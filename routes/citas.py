@@ -419,7 +419,7 @@ def qr(session=Depends(get_session)):
         qr_actual = session.exec(statement).first()
 
         if not qr_actual:
-            raise HTTPException(status_code=404, detail="Cita no encontrada")
+            raise HTTPException(status_code=404, detail="Datos del QR no encontrado")
 
         return {"mensaje": "exitoso",
                 'datos': qr_actual}
@@ -430,13 +430,9 @@ def qr(session=Depends(get_session)):
 @router.patch("/qr_update/{nuevo_qr}")
 def qr_update(nuevo_qr : str ,session=Depends(get_session)):
     try:
-        statement = select(SystemSetting)
-        qr_actual = session.exec(statement).first()
-
-        if not qr_actual:
-            raise HTTPException(status_code=404, detail="Cita no encontrada")
-
-        qr_actual.qr_descripcion = nuevo_qr
+        actualizar_qr = SystemSetting(
+            qr_descripcion = nuevo_qr)
+        session.add(actualizar_qr)
         session.commit()
 
         return {"mensaje": "exitoso"}
