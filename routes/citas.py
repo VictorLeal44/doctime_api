@@ -430,9 +430,17 @@ def qr(session=Depends(get_session)):
 @router.patch("/qr_update/{nuevo_qr}")
 def qr_update(nuevo_qr : str ,session=Depends(get_session)):
     try:
-        actualizar_qr = SystemSetting(
+        statement = select(SystemSetting)
+        qr_actual = session.exec(statement).first()
+
+        if not qr_actual:
+            actualizar_qr = SystemSetting(
             qr_descripcion = nuevo_qr)
-        session.add(actualizar_qr)
+            session.add(actualizar_qr)
+            return {"mensaje": "exitoso"}
+
+        qr_actual.qr_descripcion = nuevo_qr
+        session.add(qr_actual)
         session.commit()
 
         return {"mensaje": "exitoso"}
