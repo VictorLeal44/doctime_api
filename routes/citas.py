@@ -432,9 +432,7 @@ def qr_update(nuevo_qr : str ,session=Depends(get_session)):
     try:
         statement = select(SystemSetting)
         qr_actual = session.exec(statement).first()
-        print(qr_actual)
         if qr_actual == None:
-            print('no existe')
             actualizar_qr = SystemSetting(
             qr_descripcion = nuevo_qr)
             session.add(actualizar_qr)

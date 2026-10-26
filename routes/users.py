@@ -3,7 +3,7 @@ from sys import exception
 
 # from typing import List
 from fastapi import APIRouter, Depends, HTTPException, status
-from sqlmodel import Session, select
+from sqlmodel import Session, select, and_
 
 from models.database import get_session
 from models.item import *
@@ -182,10 +182,111 @@ def get_medico(especialidad_id: int, fecha: date, hora: time, session: Session =
             'datos': datos_respuesta,
         }
 
-    except HTTPException:
-        raise
+    # except HTTPException:
+    #     raise
     except Exception as e:
         print("Error en get_medico:", e)
+        session.rollback()
+        return {"mensaje": "Fallido", "error": str(e)}
+
+@router.get("/get_medico_automatic")
+def get_medico_automatic(especialidad_id: int, session: Session = Depends(get_session)):
+    try:
+        hoy = datetime.now().date()
+        fecha_limite = hoy + timedelta(days=7)
+        DURACION_CITA_MINUTOS = 30  # Puedes ajustar la duración aquí si lo necesitas
+
+        statement = (
+            select(
+                Medicos.id.label("medico_id"),
+                Usuarios.nombre_completo.label("nombre_medico"),
+                Horarios.id.label("horario_id"),
+                Horarios.dias_id,
+                Horarios.hora_de_entrada,
+                Horarios.hora_de_salida,
+                Citas.fecha_de_encuentro,
+                Citas.hora_de_encuentro,
+            )
+            .join(Medicos, Horarios.medico_id == Medicos.id)
+            .join(Usuarios, Medicos.usuarios_id == Usuarios.id)
+            .outerjoin(
+                Citas,
+                and_(
+                    Citas.medicos_id == Medicos.id,
+                    Citas.fecha_de_encuentro >= hoy,
+                    Citas.fecha_de_encuentro <= fecha_limite
+                )
+            )
+            .where(
+                Medicos.especialidad_id == especialidad_id,
+                Horarios.activo == True
+            )
+        )
+
+        resultados = session.exec(statement).all()
+
+        if not resultados:
+            raise HTTPException(
+                status_code=404,
+                detail="No hay horarios ni médicos disponibles para la especialidad solicitada."
+            )
+
+        # 1. Crear un conjunto (set) con las citas ya ocupadas para búsqueda rápida O(1)
+        citas_ocupadas = {
+            (row.medico_id, row.fecha_de_encuentro, row.hora_de_encuentro)
+            for row in resultados if row.fecha_de_encuentro is not None
+        }
+
+        # 2. Diccionario auxiliar para agrupar los slots por médico
+        medicos_dict = {}
+
+        for fila in resultados:
+            if fila.medico_id not in medicos_dict:
+                medicos_dict[fila.medico_id] = {
+                    "medico_id": fila.medico_id,
+                    "nombre_medico": fila.nombre_medico.strip() if isinstance(fila.nombre_medico, str) else fila.nombre_medico,
+                    "slots_disponibles": []
+                }
+
+        # 3. Recorrer los próximos 7 días y generar los bloques de tiempo
+        for i in range(7):
+            dia_actual = hoy + timedelta(days=i)
+            dia_semana = dia_actual.weekday() + 1  # Lunes=1 ... Domingo=7
+
+            # Filtrar los horarios configurados para este día de la semana
+            horarios_dia = [r for r in resultados if r.dias_id == dia_semana]
+
+            for h in horarios_dia:
+                hora_inicio_slot = datetime.combine(dia_actual, h.hora_de_entrada)
+                hora_fin_jornada = datetime.combine(dia_actual, h.hora_de_salida)
+
+                while hora_inicio_slot + timedelta(minutes=DURACION_CITA_MINUTOS) <= hora_fin_jornada:
+                    slot_fecha = hora_inicio_slot.date()
+                    slot_hora = hora_inicio_slot.time()
+
+                    # Validar que el slot no esté ocupado por una cita existente
+                    if (h.medico_id, slot_fecha, slot_hora) not in citas_ocupadas:
+                        if h.medico_id in medicos_dict:
+                            medicos_dict[h.medico_id]["slots_disponibles"].append({
+                                "fecha": slot_fecha.isoformat(),
+                                "hora_inicio": slot_hora.strftime("%H:%M"),
+                                "hora_fin": (hora_inicio_slot + timedelta(minutes=DURACION_CITA_MINUTOS)).time().strftime("%H:%M")
+                            })
+
+                    hora_inicio_slot += timedelta(minutes=DURACION_CITA_MINUTOS)
+
+        # 4. Convertir el diccionario a lista para el JSON de respuesta
+        datos_respuesta = list(medicos_dict.values())
+
+        return {
+            'mensaje': 'funcionó',
+            'datos': datos_respuesta,
+        }
+
+    except HTTPException as he:
+        raise he
+    except Exception as e:
+        print("Error en get_medico_automatic:", e)
         session.rollback()
         return {"mensaje": "Fallido", "error": str(e)}
 
