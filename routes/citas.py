@@ -143,7 +143,8 @@ def get_appointment_by_user(id: int, session: Session = Depends(get_session)):
                 Citas.fecha_de_encuentro,
                 Citas.hora_de_encuentro,
                 Citas.asunto,
-                Estado.estado.label("nombre_estado")
+                Estado.estado.label("nombre_estado"),
+                Citas.enviado
             )
             .join(Medicos, Citas.medicos_id == Medicos.id, isouter=True)
             .join(Usuarios, Medicos.usuarios_id == Usuarios.id, isouter=True)

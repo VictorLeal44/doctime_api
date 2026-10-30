@@ -194,9 +194,10 @@ def get_medico_automatic(especialidad_id: int, session: Session = Depends(get_se
     try:
         hoy = datetime.now().date()
         fecha_limite = hoy + timedelta(days=7)
-        DURACION_CITA_MINUTOS = 30  # Puedes ajustar la duración aquí si lo necesitas
+        DURACION_CITA_MINUTOS = 30  # Duración de cada bloque
 
-        statement = (
+        # 1. Obtener todos los horarios activos y sus médicos para la especialidad
+        statement_horarios = (
             select(
                 Medicos.id.label("medico_id"),
                 Usuarios.nombre_completo.label("nombre_medico"),
@@ -204,43 +205,44 @@ def get_medico_automatic(especialidad_id: int, session: Session = Depends(get_se
                 Horarios.dias_id,
                 Horarios.hora_de_entrada,
                 Horarios.hora_de_salida,
-                Citas.fecha_de_encuentro,
-                Citas.hora_de_encuentro,
             )
             .join(Medicos, Horarios.medico_id == Medicos.id)
             .join(Usuarios, Medicos.usuarios_id == Usuarios.id)
-            .outerjoin(
-                Citas,
-                and_(
-                    Citas.medicos_id == Medicos.id,
-                    Citas.fecha_de_encuentro >= hoy,
-                    Citas.fecha_de_encuentro <= fecha_limite
-                )
-            )
             .where(
                 Medicos.especialidad_id == especialidad_id,
                 Horarios.activo == True
             )
         )
+        horarios_resultados = session.exec(statement_horarios).all()
 
-        resultados = session.exec(statement).all()
-
-        if not resultados:
+        if not horarios_resultados:
             raise HTTPException(
                 status_code=404,
                 detail="No hay horarios ni médicos disponibles para la especialidad solicitada."
             )
 
-        # 1. Crear un conjunto (set) con las citas ya ocupadas para búsqueda rápida O(1)
-        citas_ocupadas = {
-            (row.medico_id, row.fecha_de_encuentro, row.hora_de_encuentro)
-            for row in resultados if row.fecha_de_encuentro is not None
-        }
+        # 2. Obtener las citas existentes en el rango de los 7 días para estos médicos
+        medico_ids = list(set([h.medico_id for h in horarios_resultados]))
 
-        # 2. Diccionario auxiliar para agrupar los slots por médico
+        citas_ocupadas = set()
+        if medico_ids:
+            statement_citas = select(Citas).where(
+                Citas.medicos_id.in_(medico_ids),
+                Citas.fecha_de_encuentro >= hoy,
+                Citas.fecha_de_encuentro <= fecha_limite
+            )
+            citas_resultados = session.exec(statement_citas).all()
+
+            # Crear un conjunto (set) de búsqueda rápida O(1)
+            citas_ocupadas = {
+                (c.medicos_id, c.fecha_de_encuentro, c.hora_de_encuentro)
+                for c in citas_resultados
+            }
+
+        # 3. Diccionario auxiliar para agrupar los slots por médico
         medicos_dict = {}
 
-        for fila in resultados:
+        for fila in horarios_resultados:
             if fila.medico_id not in medicos_dict:
                 medicos_dict[fila.medico_id] = {
                     "medico_id": fila.medico_id,
@@ -248,13 +250,13 @@ def get_medico_automatic(especialidad_id: int, session: Session = Depends(get_se
                     "slots_disponibles": []
                 }
 
-        # 3. Recorrer los próximos 7 días y generar los bloques de tiempo
+        # 4. Recorrer los 7 días y generar los bloques de tiempo respetando el día de la semana
         for i in range(7):
             dia_actual = hoy + timedelta(days=i)
             dia_semana = dia_actual.weekday() + 1  # Lunes=1 ... Domingo=7
 
-            # Filtrar los horarios configurados para este día de la semana
-            horarios_dia = [r for r in resultados if r.dias_id == dia_semana]
+            # Filtrar los horarios que aplican exactamente para este día de la semana
+            horarios_dia = [r for r in horarios_resultados if r.dias_id == dia_semana]
 
             for h in horarios_dia:
                 hora_inicio_slot = datetime.combine(dia_actual, h.hora_de_entrada)
@@ -264,7 +266,7 @@ def get_medico_automatic(especialidad_id: int, session: Session = Depends(get_se
                     slot_fecha = hora_inicio_slot.date()
                     slot_hora = hora_inicio_slot.time()
 
-                    # Validar que el slot no esté ocupado por una cita existente
+                    # Validar si el slot está libre (no está en citas_ocupadas)
                     if (h.medico_id, slot_fecha, slot_hora) not in citas_ocupadas:
                         if h.medico_id in medicos_dict:
                             medicos_dict[h.medico_id]["slots_disponibles"].append({
@@ -275,7 +277,7 @@ def get_medico_automatic(especialidad_id: int, session: Session = Depends(get_se
 
                     hora_inicio_slot += timedelta(minutes=DURACION_CITA_MINUTOS)
 
-        # 4. Convertir el diccionario a lista para el JSON de respuesta
+        # 5. Convertir el diccionario a lista para la respuesta JSON
         datos_respuesta = list(medicos_dict.values())
 
         return {
