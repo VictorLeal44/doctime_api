@@ -174,7 +174,7 @@ class Citas(SQLModel, table=True):
     fecha_de_encuentro: date
     hora_de_encuentro: time
     asunto: str = Field(sa_type=CHAR(255))
-    enviado: date
+    fecha_de_inicio: datetime
     estado_id: int = Field(foreign_key="estado.id")
     especialidad_id: int = Field(foreign_key="especialidad.id")
 

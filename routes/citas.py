@@ -9,10 +9,14 @@ from typing import List
 from models.item import Citas, Pacientes, Medicos, Usuarios, Estado, SystemSetting,Notificaciones
 from schemas.form import *
 
-from datetime import date
 import calendar
 from routes.websocket_manager import manager
 
+from datetime import datetime, date
+from zoneinfo import ZoneInfo
+
+# Define tu zona horaria de Venezuela al inicio del archivo o del router
+TZ_VE = ZoneInfo("America/Caracas")
 router = APIRouter()
 
 @router.get("/")
@@ -50,7 +54,7 @@ def get_all_appointments(tamano_lote: int = 10, session: Session = Depends(get_s
                 "Fecha_de_encuentro": str(cita.fecha_de_encuentro) if cita.fecha_de_encuentro else "",
                 "Hora_de_encuentro": str(cita.hora_de_encuentro) if cita.hora_de_encuentro else "",
                 "Asunto": cita.asunto.strip() if cita.asunto else "",
-                "Enviado": str(cita.enviado) if cita.enviado else "",
+                "Enviado": str(cita.fecha_de_inicio) if cita.fecha_de_inicio else "",
                 "Estado": cita.estado.estado.strip() if cita.estado else "Desconocido",
                 "Especialidad_id": cita.especialidad_id
             }
@@ -144,14 +148,13 @@ def get_appointment_by_user(id: int, session: Session = Depends(get_session)):
                 Citas.hora_de_encuentro,
                 Citas.asunto,
                 Estado.estado.label("nombre_estado"),
-                Citas.enviado
+                Citas.fecha_de_inicio
             )
             .join(Medicos, Citas.medicos_id == Medicos.id, isouter=True)
             .join(Usuarios, Medicos.usuarios_id == Usuarios.id, isouter=True)
             .join(Estado, Citas.estado_id == Estado.id, isouter=True)
             .where(Citas.pacientes_id == id)
         )
-
         resultados = session.exec(statement).mappings().all()
 
         return {
@@ -308,16 +311,23 @@ async def accept_appointment(values: AceptCita, session=Depends(get_session)):
                 status_code=404,
                 detail=f"La cita con ID {values.id} no existe en la base de datos.",
             )
+        print(cita)
         cita.estado_id = 2
         cita.medicos_id = values.medico_id
         cita.fecha_de_encuentro = values.fecha
         cita.hora_de_encuentro = values.hora
+
+        # CORRECCIÓN: Mantenemos la zona horaria completa para que coincida con TIMESTAMP WITH TIME ZONE
+        cita.fecha_de_inicio = datetime.now(TZ_VE)
+
         session.add(cita)
+
         nueva_notificacion = Notificaciones(
             usuario_id=values.Usuario_id,
             titulo="¡Cita Aceptada!",
             descripcion=f"Tu cita fue programada para el {values.fecha} a las {values.hora}.",
-            leida=False
+            leida=False,
+            fecha_de_creacion=datetime.now(TZ_VE)
         )
         session.add(nueva_notificacion)
 
@@ -329,14 +339,14 @@ async def accept_appointment(values: AceptCita, session=Depends(get_session)):
             "usuario_id": nueva_notificacion.usuario_id,
             "titulo": nueva_notificacion.titulo,
             "descripcion": nueva_notificacion.descripcion,
-            "leida": nueva_notificacion.leida
+            "leida": nueva_notificacion.leida,
+            # "fecha_de_creacion": nueva_notificacion.fecha_de_creacion.isoformat()
         }
 
         await manager.send_to_user(values.Usuario_id, payload)
         return {"mensaje": "exitoso"}
     except Exception as e:
         print(values)
-
         print("simplemente falló", e)
         session.rollback()
         return {"mensaje": "Fallido"}
@@ -472,7 +482,15 @@ def view_notification(id: int ,session=Depends(get_session)):
         statement = select(Notificaciones).where(Notificaciones.usuario_id == id)
         datos = session.exec(statement).all()
         return {"mensaje": "exitoso",
-                "datos": datos}
+                "datos": [{'id':i.id,
+                           'usuario_id':i.usuario_id,
+                           'titulo':i.titulo,
+                           'descripcion':i.descripcion,
+                           'leida':i.leida,
+                           'fecha_de_creacion':i.fecha_de_creacion.strftime("%Y-%m-%d %H:%M:%S")
+                    }
+                for i in datos]}
     except Exception as e:
         session.rollback()
         return {"mensaje": f"Fallido: {str(e)}"}
+
