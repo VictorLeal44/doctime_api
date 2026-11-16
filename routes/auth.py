@@ -89,13 +89,10 @@ def login(data: LoginForm, session: Session = Depends(get_session)):
             detail="El usuario no tiene un perfil de paciente ni de médico asociado."
         )
 
-    except HTTPException as he:
-        raise he
+    except HTTPException as e:
+        raise e
     except Exception as e:
         session.rollback()
-        print("--- ERROR EXACTO DE PYTHON ---")
-        traceback.print_exc()  # Imprime la línea exacta del fallo en la consola de FastAPI
-        print("------------------------------")
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=f"Error al iniciar sesión: {str(e)}"
