@@ -9,6 +9,10 @@ from models.database import get_session
 from models.item import Admin, Usuarios, Pacientes, Medicos
 from security.security import *
 from schemas.form import LoginForm, LoginFormAdmin, PacienteRead,MedicoSessionOut, SinginForm, HorarioOut, UsuarioPacienteSingin
+import os
+import smtplib
+from email.message import EmailMessage
+import random
 
 router = APIRouter()
 
@@ -204,12 +208,71 @@ def signin_user(new_data: UsuarioPacienteSingin, session: Session = Depends(get_
             detail=f"Error al registrar el usuario: {str(e)}"
         )
 
-@router.post("/new_password_admin")
-# Recibe el email para saber a quién actualizar
-def new_password_admin(email: str, password: str, session: Session = Depends(get_session)):
-    statement = select(Admin).where(Admin.email == email)
-    admin_user = session.exec(statement).first()
-    if not admin_user:
-        raise HTTPException(status_code=404, detail="Admin no encontrado")
-    # Aquí iría la lógica de hashing y guardado
-    return {"status": "actualizado"}
+@router.get("/solicitar_email")
+def solicitar_email(email: str,user: bool, session: Session = Depends(get_session)):
+
+    if user:
+        print("es un usuario")
+        statement = select(exists().where(Usuarios.email == email))
+    else:
+        print("es un administrador")
+        statement = select(exists().where(Admin.email == email))
+    resultado = session.exec(statement).one()
+
+    if resultado:
+        remitente = "victorpaololeal@gmail.com"
+        destinatario = email
+        # # Usa una contraseña de aplicación y guárdala en variables de entorno
+        contrasena = "dwdk qnpd kkua wnva"
+        # print("checkear el archivo")
+        # print(contrasena)
+        msg = EmailMessage()
+        msg["Subject"] = "Codigo de recuperación de contraseña"
+        msg["From"] = remitente
+        msg["To"] = destinatario
+
+        codigo = random.randint(10000,99999)
+
+        msg.set_content(f"Hola, este es el código para la recuperación de su cuenta de Doctime. {codigo}")
+        #
+        with smtplib.SMTP_SSL("smtp.gmail.com", 465) as smtp:
+            smtp.login(remitente, contrasena)
+            smtp.send_message(msg)
+
+        return codigo
+    return None
+
+@router.post("/nueva_contraseña")
+def nueva_contraseña(password: str,email,user: bool, session: Session = Depends(get_session)):
+    try:
+        password_en_bytes = generar_hash_contrasena(password)
+        if user:
+            statement = select(Usuarios).where(Usuarios.email == email)
+            usuario = session.exec(statement).first()
+            if usuario is None:
+                print("el usuario no existe en la base de datos.")
+                raise HTTPException(
+                    status_code=404,
+                    detail="no existe en la base de datos.",
+                )
+            usuario.contraseña = password_en_bytes
+            session.add(usuario)
+            session.commit()
+            return {"mensaje": "exitoso"}
+        else:
+            statement = select(Admin).where(Admin.email == email)
+            admin = session.exec(statement).first()
+            if admin is None:
+                print("el usuario no existe en la base de datos.")
+                raise HTTPException(
+                    status_code=404,
+                    detail="no existe en la base de datos.",
+                )
+            admin.contraseña = password_en_bytes
+            session.add(admin)
+            session.commit()
+            return {"mensaje": "exitoso"}
+    except Exception as e:
+        print("simplemente falló", e)
+        session.rollback()
+        return {"mensaje": "Fallido"}

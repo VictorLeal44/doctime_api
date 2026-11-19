@@ -193,7 +193,7 @@ def get_medico(especialidad_id: int, fecha: date, hora: time, session: Session =
 def get_medico_automatic(especialidad_id: int, session: Session = Depends(get_session)):
     try:
         hoy = datetime.now().date()
-        fecha_limite = hoy + timedelta(days=7)
+        fecha_limite = hoy + timedelta(days=14)
         DURACION_CITA_MINUTOS = 30  # Duración de cada bloque
 
         # 1. Obtener todos los horarios activos y sus médicos para la especialidad
@@ -497,8 +497,7 @@ def update_user_patient(paciente_id: int,datos_nuevos: UsuarioPacienteEdit, sess
                 status_code=404,
                 detail="no existe en la base de datos.",
             )
-        if datos_nuevos.paciente.fecha_de_nacimiento == None:
-            paciente.fecha_de_nacimiento = datos_nuevos.paciente.fecha_de_nacimiento
+        paciente.fecha_de_nacimiento = datos_nuevos.paciente.fecha_de_nacimiento
         paciente.telefono_de_emergencia = datos_nuevos.paciente.telefono
         paciente.direccion = datos_nuevos.paciente.direccion
         paciente.grupo_sanguineo_id = datos_nuevos.paciente.tipo_de_sangre
